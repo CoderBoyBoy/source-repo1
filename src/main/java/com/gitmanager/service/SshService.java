@@ -16,6 +16,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 @Service
 public class SshService {
@@ -37,7 +40,12 @@ public class SshService {
         this.sshSessionFactory = new JschConfigSessionFactory() {
             @Override
             protected void configure(OpenSshConfig.Host host, Session session) {
-                session.setConfig("StrictHostKeyChecking", "no");
+                // Use known hosts for verification when available, otherwise disable strict checking
+                if (customKnownHosts != null || sshConfig.getKnownHostsPath() != null) {
+                    session.setConfig("StrictHostKeyChecking", "yes");
+                } else {
+                    session.setConfig("StrictHostKeyChecking", "no");
+                }
             }
 
             @Override
@@ -47,9 +55,8 @@ public class SshService {
                 // Add custom private key if configured
                 if (customPrivateKey != null && !customPrivateKey.isEmpty()) {
                     try {
-                        Path tempKeyFile = Files.createTempFile("ssh_key", null);
+                        Path tempKeyFile = createSecureTempFile("ssh_key");
                         Files.writeString(tempKeyFile, customPrivateKey);
-                        tempKeyFile.toFile().deleteOnExit();
                         
                         if (customPassphrase != null && !customPassphrase.isEmpty()) {
                             jsch.addIdentity(tempKeyFile.toString(), customPassphrase);
@@ -74,9 +81,8 @@ public class SshService {
                 // Add custom known hosts if configured
                 if (customKnownHosts != null && !customKnownHosts.isEmpty()) {
                     try {
-                        Path tempKnownHostsFile = Files.createTempFile("known_hosts", null);
+                        Path tempKnownHostsFile = createSecureTempFile("known_hosts");
                         Files.writeString(tempKnownHostsFile, customKnownHosts);
-                        tempKnownHostsFile.toFile().deleteOnExit();
                         jsch.setKnownHosts(tempKnownHostsFile.toString());
                     } catch (IOException e) {
                         logger.error("Failed to load custom known hosts: {}", e.getMessage());
@@ -91,6 +97,17 @@ public class SshService {
                 return jsch;
             }
         };
+    }
+
+    /**
+     * Creates a temporary file with secure permissions (owner read/write only).
+     */
+    private Path createSecureTempFile(String prefix) throws IOException {
+        Set<PosixFilePermission> permissions = PosixFilePermissions.fromString("rw-------");
+        Path tempFile = Files.createTempFile(prefix, null, 
+                PosixFilePermissions.asFileAttribute(permissions));
+        tempFile.toFile().deleteOnExit();
+        return tempFile;
     }
 
     public SshSessionFactory getSshSessionFactory() {

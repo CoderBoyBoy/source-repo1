@@ -20,7 +20,7 @@ public class FileController {
     @GetMapping("/tree")
     public ResponseEntity<ApiResponse<FileTreeNode>> getFileTree(
             @PathVariable String repoName,
-            @RequestParam(defaultValue = "") String ref,
+            @RequestParam(defaultValue = "HEAD") String ref,
             @RequestParam(defaultValue = "") String path) {
         FileTreeNode tree = fileService.getFileTree(repoName, ref, path);
         return ResponseEntity.ok(ApiResponse.success(tree));
@@ -29,7 +29,7 @@ public class FileController {
     @GetMapping("/content")
     public ResponseEntity<ApiResponse<FileContent>> getFileContent(
             @PathVariable String repoName,
-            @RequestParam(defaultValue = "") String ref,
+            @RequestParam(defaultValue = "HEAD") String ref,
             @RequestParam String path) {
         FileContent content = fileService.getFileContent(repoName, ref, path);
         return ResponseEntity.ok(ApiResponse.success(content));
